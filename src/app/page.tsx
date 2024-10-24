@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type FormData = {
   desiredProtein: string;
@@ -178,6 +179,8 @@ interface OptimizerFormProps {
   errors: Partial<FormData>;
   formData: FormData;
   handleChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  selectedIngredients: string[];
+  handleIngredientToggle: (ingredientName: string) => void;
 }
 
 function OptimizerForm({
@@ -186,6 +189,8 @@ function OptimizerForm({
   errors,
   formData,
   handleChange,
+  selectedIngredients,
+  handleIngredientToggle,
 }: OptimizerFormProps) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -219,6 +224,21 @@ function OptimizerForm({
             )}
           </div>
         ))}
+      </div>
+      <div className="space-y-2">
+        <Label>Select Ingredients</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {ingredients.map((ingredient) => (
+            <div key={ingredient.name} className="flex items-center space-x-2">
+              <Checkbox
+                id={ingredient.name}
+                checked={selectedIngredients.includes(ingredient.name)}
+                onCheckedChange={() => handleIngredientToggle(ingredient.name)}
+              />
+              <Label htmlFor={ingredient.name}>{ingredient.name}</Label>
+            </div>
+          ))}
+        </div>
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (
@@ -278,6 +298,7 @@ export default function Home() {
   const [errors, setErrors] = useState<Partial<FormData>>({});
   const [result, setResult] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const { toast } = useToast();
 
   const validateForm = (): boolean => {
@@ -293,6 +314,15 @@ export default function Home() {
       }
     });
 
+    if (selectedIngredients.length === 0) {
+      toast({
+        title: "No ingredients selected",
+        description: "Please select at least one ingredient.",
+        variant: "destructive",
+      });
+      valid = false;
+    }
+
     setErrors(newErrors);
     return valid;
   };
@@ -302,16 +332,18 @@ export default function Home() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleIngredientToggle = (ingredientName: string) => {
+    setSelectedIngredients((prev) =>
+      prev.includes(ingredientName)
+        ? prev.filter((name) => name !== ingredientName)
+        : [...prev, ingredientName]
+    );
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!validateForm()) {
-      toast({
-        title: "Invalid input",
-        description: "Please fill in all the fields correctly.",
-        variant: "destructive",
-        action: <ToastAction altText="Try again">Try again</ToastAction>,
-      });
       return;
     }
 
@@ -323,14 +355,15 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(
-          Object.fromEntries(
+        body: JSON.stringify({
+          ...Object.fromEntries(
             Object.entries(formData).map(([key, value]) => [
               key,
               parseFloat(value),
             ])
-          )
-        ),
+          ),
+          selectedIngredients,
+        }),
       });
 
       if (!res.ok) {
@@ -379,6 +412,8 @@ export default function Home() {
                 errors={errors}
                 formData={formData}
                 handleChange={handleChange}
+                selectedIngredients={selectedIngredients}
+                handleIngredientToggle={handleIngredientToggle}
               />
               {result && (
                 <div className="mt-6">
